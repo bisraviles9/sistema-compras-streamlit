@@ -1,7 +1,7 @@
 import csv
 import io
 import sqlite3
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -56,6 +56,58 @@ def iniciar_base():
                 FOREIGN KEY(producto_id) REFERENCES productos(id)
             );
         """)
+        # Carga este ejemplo ficticio una sola vez, solo si la base está vacía.
+        proveedores = db.execute("SELECT COUNT(*) FROM proveedores").fetchone()[0]
+        productos = db.execute("SELECT COUNT(*) FROM productos").fetchone()[0]
+        compras = db.execute("SELECT COUNT(*) FROM compras").fetchone()[0]
+        if proveedores == 0 and productos == 0 and compras == 0:
+            distribuidora = db.execute(
+                "INSERT INTO proveedores(nombre, contacto, telefono, email) VALUES (?, ?, ?, ?)",
+                ("Distribuidora Andina", "Área de ventas", "0990000000", "ventas@andina.example"),
+            ).lastrowid
+            papeleria = db.execute(
+                "INSERT INTO proveedores(nombre, contacto, telefono, email) VALUES (?, ?, ?, ?)",
+                ("Papelería Central", "Atención al cliente", "0980000000", "contacto@papeleriacentral.example"),
+            ).lastrowid
+            papel = db.execute(
+                "INSERT INTO productos(nombre, categoria, stock, stock_minimo) VALUES (?, ?, ?, ?)",
+                ("Papel bond A4 (resma)", "Papelería", 5, 10),
+            ).lastrowid
+            toner = db.execute(
+                "INSERT INTO productos(nombre, categoria, stock, stock_minimo) VALUES (?, ?, ?, ?)",
+                ("Tóner láser", "Suministros de oficina", 0, 3),
+            ).lastrowid
+            cuaderno = db.execute(
+                "INSERT INTO productos(nombre, categoria, stock, stock_minimo) VALUES (?, ?, ?, ?)",
+                ("Cuaderno universitario", "Papelería", 0, 8),
+            ).lastrowid
+            marcadores = db.execute(
+                "INSERT INTO productos(nombre, categoria, stock, stock_minimo) VALUES (?, ?, ?, ?)",
+                ("Marcadores (paquete)", "Papelería", 3, 5),
+            ).lastrowid
+            hoy = date.today()
+            fecha_mes_anterior = (hoy.replace(day=1) - timedelta(days=1)).replace(day=10)
+            fecha_mes_actual = hoy.replace(day=min(5, hoy.day))
+            compra_1 = db.execute(
+                "INSERT INTO compras(proveedor_id, fecha, observacion) VALUES (?, ?, ?)",
+                (distribuidora, fecha_mes_anterior.isoformat(), "Ejemplo: reposición de suministros"),
+            ).lastrowid
+            db.executemany(
+                "INSERT INTO detalle_compra(compra_id, producto_id, cantidad, precio_unitario) VALUES (?, ?, ?, ?)",
+                [(compra_1, papel, 15, 5.50), (compra_1, toner, 1, 29.90)],
+            )
+            db.execute("UPDATE productos SET stock = stock + 15 WHERE id = ?", (papel,))
+            db.execute("UPDATE productos SET stock = stock + 1 WHERE id = ?", (toner,))
+            compra_2 = db.execute(
+                "INSERT INTO compras(proveedor_id, fecha, observacion) VALUES (?, ?, ?)",
+                (papeleria, fecha_mes_actual.isoformat(), "Ejemplo: compra mensual de papelería"),
+            ).lastrowid
+            db.executemany(
+                "INSERT INTO detalle_compra(compra_id, producto_id, cantidad, precio_unitario) VALUES (?, ?, ?, ?)",
+                [(compra_2, cuaderno, 12, 2.40), (compra_2, marcadores, 10, 1.25)],
+            )
+            db.execute("UPDATE productos SET stock = stock + 12 WHERE id = ?", (cuaderno,))
+            db.execute("UPDATE productos SET stock = stock + 10 WHERE id = ?", (marcadores,))
 
 
 def consultar(sql, params=()):
